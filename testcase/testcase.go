@@ -1,24 +1,37 @@
 package testcase
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"math"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/chrisbdaemon/levyfuzzing/coverage"
 )
+
+// ShowMapPath is the path to a functional afl-showmap executable
+var ShowMapPath = "afl-showmap"
 
 // TestCase is the object representing a single
 // test case. It holds coverage results and other
 // data specific to each test case.
 type TestCase struct {
 	filename     string
-	coverage     []int64
+	coverage     *coverage.Coverage
 	segmentCount int64
 	segmentSize  int64
 }
+
+// Coverage allows access to Coverage through an interface
+func (t *TestCase) Coverage() *coverage.Coverage { return t.coverage }
 
 // New creates and returns a new TestCase object after
 // verifying the given filename exists and is accessible
@@ -80,6 +93,65 @@ func GenerateNew(seed *TestCase, outputDir string,
 
 		testCases = append(testCases, newTestCase)
 	}
+
+	return
+}
+
+// Execute uses cmd to collect coverage data for a given test case
+func (t *TestCase) Execute(cmdStr string) (err error) {
+	showMapArgs := fmt.Sprintf("-t 2000 -m 2048 -o @@.map -q -e -- %s", cmdStr)
+	showMapArgs = strings.Replace(showMapArgs, "@@", t.filename, -1)
+
+	cmd := exec.Command(ShowMapPath, strings.Split(" ", showMapArgs)...)
+	err = cmd.Run()
+	if _, ok := err.(*exec.ExitError); ok {
+		// ignore exit status
+		err = nil
+	}
+
+	err = t.collectCoverageData()
+	if err != nil {
+		err = fmt.Errorf("Error collecting coverage data: %s", err)
+	}
+
+	return
+}
+
+func (t *TestCase) collectCoverageData() (err error) {
+	mapFilename := fmt.Sprintf("%s.map", t.filename)
+	mapFile, err := os.Open(mapFilename)
+	if err != nil {
+		return
+	}
+	defer mapFile.Close()
+
+	cov := coverage.New()
+
+	var mapEntry []byte
+	var mapValue int
+	mapReader := bufio.NewReader(mapFile)
+	for {
+		mapEntry, err = mapReader.ReadBytes('\n')
+		if err == io.EOF {
+			err = nil
+			break
+		} else if err != nil {
+			err = fmt.Errorf("error reading %s: %s", mapFilename, err)
+			return
+		}
+
+		mapEntry = mapEntry[:bytes.IndexByte(mapEntry, ':')]
+
+		mapValue, err = strconv.Atoi(string(mapEntry))
+		if err != nil {
+			err = fmt.Errorf("%s appears corrupt: %s", mapFilename, err)
+			return
+		}
+
+		cov.Add(mapValue)
+	}
+
+	t.coverage = cov
 
 	return
 }
