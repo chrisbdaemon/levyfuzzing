@@ -102,11 +102,10 @@ func (t *TestCase) Execute(cmdStr string) (err error) {
 	showMapArgs := fmt.Sprintf("-t 2000 -m 2048 -o @@.map -q -e -- %s", cmdStr)
 	showMapArgs = strings.Replace(showMapArgs, "@@", t.filename, -1)
 
-	cmd := exec.Command(ShowMapPath, strings.Split(" ", showMapArgs)...)
+	cmd := exec.Command(ShowMapPath, strings.Split(showMapArgs, " ")...)
 	err = cmd.Run()
-	if _, ok := err.(*exec.ExitError); ok {
-		// ignore exit status
-		err = nil
+	if err != nil {
+		return
 	}
 
 	err = t.collectCoverageData()

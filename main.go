@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/chrisbdaemon/levyfuzzing/coverage"
 	"github.com/chrisbdaemon/levyfuzzing/evaluate"
 	"github.com/chrisbdaemon/levyfuzzing/testcase"
 )
@@ -47,15 +48,17 @@ func main() {
 		log.Fatalln("Unable to execute binary:", err)
 	}
 
-	fmt.Println(seed.Coverage())
-
 	var testCases []*testcase.TestCase
 	var newTestCases []*testcase.TestCase
 	a1, a2 := seedParams()
 	segmentOffset := rand.Int63n(int64(*segmentCount))
 
+	allCoverage := seed.Coverage()
+
 	testCases = append(testCases, seed)
 	for {
+		var newCoverage []*coverage.Coverage
+
 		seed = testCases[len(testCases)-1]
 		newTestCases, err = testcase.GenerateNew(seed, *outputDir, a1, a2, segmentOffset, int64(*roundSize))
 		if err != nil {
@@ -67,14 +70,23 @@ func main() {
 			log.Fatal("Unable to execute test cases:", err)
 		}
 
-		score, err := evaluate.Score(newTestCases, testCases)
+		for _, testCase := range newTestCases {
+			newCoverage = append(newCoverage, testCase.Coverage())
+		}
+
+		score, err := evaluate.Score(newCoverage, allCoverage)
 		if err != nil {
 			log.Fatalln("Unable to evaluate test cases:", err)
 		}
+		fmt.Println(score)
+
+		for _, c := range newCoverage {
+			allCoverage = allCoverage.Union(c)
+		}
+
 		a1, a2 = updateParameters(int64(score), a1, a2, b1, b2)
 
 		testCases = append(testCases, newTestCases...)
-		break
 	}
 }
 
@@ -92,7 +104,7 @@ func updateParameters(score int64, a1, a2, b1, b2 float64) (a1New, a2New float64
 	a1New = a1
 	a2New = a2
 
-	// not yet implemented
+	log.Println("updateParameters has not be implemented yet, results will be stale")
 
 	return
 }
