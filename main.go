@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"time"
@@ -33,6 +34,9 @@ func main() {
 			os.Exit(2)
 		}
 	}
+
+	b1 = 3
+	b2 = 3
 
 	if *showMapPath != "" {
 		testcase.ShowMapPath = *showMapPath
@@ -104,7 +108,8 @@ func updateParameters(score int64, a1, a2, b1, b2 float64) (a1New, a2New float64
 	a1New = a1
 	a2New = a2
 
-	log.Println("updateParameters has not be implemented yet, results will be stale")
+	a1New = 1/(1+math.Exp(b1-float64(score))) + 1
+	a2New = 1/(1+math.Exp(b2-float64(score))) + 1
 
 	return
 }
@@ -113,7 +118,7 @@ func seedParams() (a1, a2 float64) {
 	rand.Seed(time.Now().Unix())
 
 	// generate two floats.. [0,2)
-	a1 = rand.Float64() + float64(rand.Int63n(2))
-	a2 = rand.Float64() + float64(rand.Int63n(2))
+	a1 = rand.Float64() + 1
+	a2 = rand.Float64() + 1
 	return
 }
